@@ -18,6 +18,47 @@ export function Mt5Account() {
     )
   }
 
+  // Credentials saved, waiting for the Python engine to verify the login with MT5.
+  if (account && account.status === "pending") {
+    return (
+      <section className="mt5-card mt5-status glass-panel reveal">
+        <div className="mt5-status-inner">
+          <span className="mt5-status-spinner" aria-hidden="true" />
+          <h2 className="mt5-status-title">Vérification de la connexion MT5...</h2>
+          <p className="mt5-status-text">
+            Compte <strong>{account.login}</strong> sur <strong>{account.server}</strong>. La
+            connexion est établie par le terminal MetaTrader 5. Cela peut prendre quelques
+            secondes.
+          </p>
+          <button type="button" className="dash-btn dash-btn-secondary" onClick={openConnectModal}>
+            Modifier les identifiants
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  // The engine tried to log in and failed (bad credentials, or real account during trial).
+  if (account && account.status === "error") {
+    return (
+      <section className="mt5-card mt5-status mt5-status-error glass-panel reveal">
+        <div className="mt5-status-inner">
+          <span className="mt5-status-icon" aria-hidden="true">
+            !
+          </span>
+          <h2 className="mt5-status-title">Connexion MT5 échouée</h2>
+          <p className="mt5-status-text">
+            {account.statusMessage ||
+              "Impossible de se connecter. Vérifiez le numéro de compte, le mot de passe investisseur et le serveur."}
+          </p>
+          <button type="button" className="dash-btn dash-btn-primary" onClick={openConnectModal}>
+            Réessayer
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   if (!connected || !account) {
     return (
       <section className="mt5-card mt5-empty glass-panel reveal">

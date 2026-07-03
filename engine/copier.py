@@ -32,8 +32,19 @@ def sync_slave(account: dict, master_positions: list, master_balance: float) -> 
 
     snap = client.account_snapshot()
     if snap is None:
-        db.mark_account_error(user_id, "Could not read account info after login.")
+        db.mark_account_error(user_id, "Impossible de lire les informations du compte après connexion.")
         return
+
+    # Enforce the trial rule using the REAL account type reported by MT5
+    # (account_info().trade_mode), not a guess from the server name.
+    is_real = snap.get("account_type") != "Demo"
+    if account.get("trial_active") and is_real:
+        db.mark_account_error(
+            user_id,
+            "Periode d'essai: vous ne pouvez connecter qu'un compte DEMO. Ce compte est REEL.",
+        )
+        return
+
     db.mark_account_connected(user_id, snap)
 
     if not account.get("copy_enabled"):

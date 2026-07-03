@@ -47,24 +47,32 @@ def execute(sql: str, params: tuple = ()):
 # ---- Domain helpers ----
 
 def get_connectable_accounts():
-    """All MT5 accounts that should be synced (pending = verify, connected = keep live)."""
+    """All MT5 accounts that should be synced (pending = verify, connected = keep live).
+
+    Joins the user so the engine can enforce the trial rule (trial users may only
+    run a DEMO account). `trial_active` is 1 while the free trial is still valid.
+    """
     return fetch_all(
-        """SELECT user_id, login, server, password_enc, is_demo, status, copy_enabled
-             FROM mt5_accounts
-            WHERE status IN ('pending', 'connected')"""
+        """SELECT a.user_id, a.login, a.server, a.password_enc, a.is_demo,
+                  a.status, a.copy_enabled,
+                  (u.trial_ends_at IS NOT NULL AND u.trial_ends_at > UTC_TIMESTAMP()) AS trial_active
+             FROM mt5_accounts a
+             JOIN users u ON u.id = a.user_id
+            WHERE a.status IN ('pending', 'connected')"""
     )
 
 
 def mark_account_connected(user_id: str, info: dict):
+    is_demo = 1 if info.get("account_type") == "Demo" else 0
     execute(
         """UPDATE mt5_accounts
               SET status='connected', status_message=NULL,
-                  broker=%s, account_type=%s, leverage=%s, currency=%s,
+                  broker=%s, account_type=%s, is_demo=%s, leverage=%s, currency=%s,
                   balance=%s, equity=%s, free_margin=%s, daily_profit=%s,
                   last_sync_at=UTC_TIMESTAMP()
             WHERE user_id=%s""",
         (
-            info.get("broker"), info.get("account_type"), info.get("leverage"),
+            info.get("broker"), info.get("account_type"), is_demo, info.get("leverage"),
             info.get("currency"), info.get("balance"), info.get("equity"),
             info.get("free_margin"), info.get("daily_profit"), user_id,
         ),

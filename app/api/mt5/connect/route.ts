@@ -37,15 +37,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "The account number must be digits only." }, { status: 400 })
   }
 
-  // During the free trial only DEMO servers are allowed.
-  const trialActive = !!user.trialEndsAt && new Date(user.trialEndsAt).getTime() > Date.now()
-  const isDemo = /demo/i.test(server)
-  if (trialActive && !isDemo) {
-    return NextResponse.json(
-      { ok: false, message: "During the free trial you can only connect a DEMO account." },
-      { status: 400 },
-    )
-  }
+  // We CANNOT reliably tell demo vs real from the server name (e.g. "XMGlobal-MT5 9"
+  // is a demo account but the name has no "demo" in it). Only MetaTrader 5 knows the
+  // real type via account_info().trade_mode. So we save the credentials as 'pending'
+  // and let the Python engine detect the real type on login and enforce the trial
+  // rule (trial users may only run a DEMO account).
+  const isDemoGuess = /demo/i.test(server)
 
   const passwordEnc = encryptSecret(password)
   const existing = await queryOne<{ id: string }>("SELECT id FROM mt5_accounts WHERE user_id = :userId", {
@@ -58,18 +55,18 @@ export async function POST(request: Request) {
           SET login = :login, server = :server, password_enc = :passwordEnc,
               is_demo = :isDemo, status = 'pending', status_message = NULL, last_sync_at = NULL
         WHERE user_id = :userId`,
-      { login, server, passwordEnc, isDemo: isDemo ? 1 : 0, userId: user.id },
+      { login, server, passwordEnc, isDemo: isDemoGuess ? 1 : 0, userId: user.id },
     )
   } else {
     await query(
       `INSERT INTO mt5_accounts (id, user_id, login, server, password_enc, is_demo, status)
        VALUES (:id, :userId, :login, :server, :passwordEnc, :isDemo, 'pending')`,
-      { id: crypto.randomUUID(), userId: user.id, login, server, passwordEnc, isDemo: isDemo ? 1 : 0 },
+      { id: crypto.randomUUID(), userId: user.id, login, server, passwordEnc, isDemo: isDemoGuess ? 1 : 0 },
     )
   }
 
   return NextResponse.json({
     ok: true,
-    message: "Credentials saved. Verifying connection to MT5...",
+    message: "Identifiants enregistrés. Vérification de la connexion à MT5 en cours...",
   })
 }

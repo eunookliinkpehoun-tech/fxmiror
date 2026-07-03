@@ -197,6 +197,15 @@ export const dashDashboardStyles = `
   .mt5-add-label { font-weight: 800; letter-spacing: .5px; }
   .mt5-add-hint { font-size: .85rem; color: var(--d-muted); }
 
+  .mt5-status { display: flex; }
+  .mt5-status-inner { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 40px 24px; }
+  .mt5-status-title { font-size: 1.2rem; font-weight: 800; margin: 0; }
+  .mt5-status-text { font-size: .9rem; color: var(--d-muted); max-width: 460px; line-height: 1.5; margin: 0; }
+  .mt5-status-spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgba(37,99,235,0.2); border-top-color: var(--d-blue); animation: mt5spin 0.9s linear infinite; }
+  @keyframes mt5spin { to { transform: rotate(360deg); } }
+  .mt5-status-error .mt5-status-title { color: #dc2626; }
+  .mt5-status-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-size: 1.6rem; font-weight: 900; background: rgba(220,38,38,0.12); color: #dc2626; }
+
   .mt5-left { display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .holo-ring { position: relative; width: 96px; height: 96px; display: grid; place-items: center; }
   .holo-ring-spin { position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--d-blue); border-right-color: var(--d-cyan); animation: dspin 3s linear infinite; }
