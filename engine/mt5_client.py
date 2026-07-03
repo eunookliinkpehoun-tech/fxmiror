@@ -11,19 +11,43 @@ import config
 
 
 def initialize_terminal() -> bool:
-    """Start the MT5 terminal once (logged into the master by default)."""
-    kwargs = dict(
-        login=config.MASTER_LOGIN,
-        password=config.MASTER_PASSWORD,
-        server=config.MASTER_SERVER,
-    )
+    """Attach to the MT5 terminal.
+
+    IMPORTANT: we do NOT pass login/password/server here. Passing the master
+    credentials makes mt5.initialize() try to (re)launch and switch the terminal,
+    which fails with (-10005, 'IPC timeout') when a terminal is already open on a
+    different account. Instead we just attach to the running/target terminal, and
+    the master + user logins are performed later with mt5.login() in the loop.
+    """
+    timeout = config.MT5_TIMEOUT
+    attempts = []
     if config.MT5_TERMINAL_PATH:
-        ok = mt5.initialize(config.MT5_TERMINAL_PATH, **kwargs)
-    else:
-        ok = mt5.initialize(**kwargs)
-    if not ok:
-        print("[MT5] initialize failed:", mt5.last_error())
-    return ok
+        attempts.append(dict(path=config.MT5_TERMINAL_PATH))
+    attempts.append(dict())  # attach to an already-running terminal / default install
+
+    last_err = None
+    for kw in attempts:
+        path = kw.get("path")
+        if path:
+            ok = mt5.initialize(path, timeout=timeout, portable=config.MT5_PORTABLE)
+        else:
+            ok = mt5.initialize(timeout=timeout, portable=config.MT5_PORTABLE)
+        if ok:
+            term = mt5.terminal_info()
+            if term is not None:
+                print(f"[MT5] attached to terminal: {term.name} (build {term.build}), "
+                      f"connected={term.connected}, trade_allowed={term.trade_allowed}")
+            return True
+        last_err = mt5.last_error()
+        print(f"[MT5] initialize attempt failed (path={path!r}):", last_err)
+        mt5.shutdown()
+
+    print("[MT5] All initialize attempts failed. Last error:", last_err)
+    print("[MT5] Checklist: 1) MetaTrader 5 is open, 2) MT5_TERMINAL_PATH points to "
+          "the EXACT terminal64.exe that is running, 3) 'Allow Algorithmic Trading' is "
+          "enabled in MT5 (Tools > Options > Expert Advisors), 4) 64-bit Python matches "
+          "the 64-bit terminal.")
+    return False
 
 
 def login(account_login: int, password: str, server: str) -> bool:

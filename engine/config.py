@@ -29,6 +29,10 @@ MASTER_SERVER = _req("MASTER_SERVER")
 
 # Path to the MT5 terminal64.exe. Leave empty to use the default installation.
 MT5_TERMINAL_PATH = os.getenv("MT5_TERMINAL_PATH", "") or None
+# Connection timeout for mt5.initialize() in milliseconds (default 60s).
+MT5_TIMEOUT = int(os.getenv("MT5_TIMEOUT", "60000"))
+# Set to "1" only if you run a PORTABLE MT5 install (terminal64.exe /portable).
+MT5_PORTABLE = os.getenv("MT5_PORTABLE", "0") == "1"
 
 # ---- Copy behaviour ----
 # Lot sizing mode:
