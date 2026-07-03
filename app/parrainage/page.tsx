@@ -72,7 +72,11 @@ function ParrainageContent() {
   useEffect(() => { loadReferrals() }, [])
 
   async function copyLink() {
-    const link = data?.referralLink || ""
+    const code = data?.referralCode || ""
+    const link =
+      code && typeof window !== "undefined"
+        ? `${window.location.origin}/?ref=${code}`
+        : data?.referralLink || ""
     if (!link) return
     try {
       await navigator.clipboard.writeText(link)
@@ -101,7 +105,12 @@ function ParrainageContent() {
 
   const stats = data?.stats
   const referrals = data?.referrals || []
-  const referralLink = data?.referralLink || ""
+  // Build the link from the real host the user is on, so it works on any domain/IP.
+  const referralCode = data?.referralCode || ""
+  const referralLink =
+    referralCode && typeof window !== "undefined"
+      ? `${window.location.origin}/?ref=${referralCode}`
+      : data?.referralLink || ""
   const availableBalance = stats?.availableBalance || 0
 
   return (

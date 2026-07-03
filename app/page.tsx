@@ -424,6 +424,7 @@ export default function Page() {
             &times;
           </button>
 
+          <div className="modal-body">
           <div className={`toggle-switch${tab === "signup" ? " signup" : ""}`}>
             <div className="toggle-slider" />
             <button className={tab === "login" ? "active" : ""} onClick={() => setTab("login")}>
@@ -476,17 +477,16 @@ export default function Page() {
                 <label htmlFor="su-pass">Mot de passe</label>
                 <input id="su-pass" name="password" type="password" placeholder="••••••••" minLength={8} required />
               </div>
-              <div className="field">
-                <label htmlFor="su-ref">Code de parrainage</label>
-                <input
-                  id="su-ref"
-                  name="referralCode"
-                  type="text"
-                  placeholder="Optionnel"
-                  value={referralCode}
-                  onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
-                />
-              </div>
+              {referralCode && (
+                <div className="ref-note" role="note">
+                  <span className="ref-note-ic">🎁</span>
+                  <span>
+                    Vous avez été invité via un lien de parrainage. Votre parrain sera
+                    automatiquement associé à votre compte.
+                  </span>
+                </div>
+              )}
+              <input type="hidden" name="referralCode" value={referralCode} />
               <button className="submit-btn" type="submit" disabled={submitting}>
                 {submitting ? "Inscription..." : "S'inscrire"}
               </button>
@@ -496,6 +496,7 @@ export default function Page() {
               </p>
             </form>
           )}
+          </div>
         </div>
       </div>
     </div>
@@ -740,13 +741,20 @@ const css = `
   }
   .modal-overlay.active { display: flex; opacity: 1; }
   .modal {
-    width: min(430px, 100%); max-width: 430px; max-height: calc(100dvh - 40px); overflow-y: auto;
+    width: min(430px, 100%); max-width: 430px; max-height: calc(100dvh - 40px);
     background: rgba(255,255,255,0.75); border: 1px solid rgba(255,255,255,0.8);
-    backdrop-filter: blur(26px); border-radius: 24px; padding: 36px;
+    backdrop-filter: blur(26px); border-radius: 24px;
     box-shadow: 0 30px 80px rgba(6,18,46,0.4);
     transform: translateY(30px) scale(.96); opacity: 0;
     transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .35s;
     position: relative; overflow: hidden;
+  }
+  .modal-body {
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto; overflow-x: hidden;
+    padding: 36px;
+    position: relative; z-index: 1;
+    overscroll-behavior: contain;
   }
   .modal-overlay.active .modal { transform: translateY(0) scale(1); opacity: 1; }
   .modal::before {
@@ -798,6 +806,13 @@ const css = `
   .submit-btn:disabled { opacity: .65; cursor: wait; transform: none; }
   .form-foot { text-align: center; font-size: .88rem; color: var(--muted); }
   .form-foot a { color: var(--blue-600); font-weight: 600; text-decoration: none; }
+  .ref-note {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.2);
+    color: var(--blue-700); border-radius: 12px; padding: 12px 14px;
+    font-size: .84rem; font-weight: 600; line-height: 1.4;
+  }
+  .ref-note-ic { font-size: 1.05rem; line-height: 1; flex: 0 0 auto; }
 
   @media (max-width: 900px) {
     .grid-4 { grid-template-columns: repeat(2,1fr); }
@@ -826,8 +841,10 @@ const css = `
     .why-list { grid-template-columns: 1fr; }
     .hero { padding: 60px 0 40px; }
     .modal-overlay { padding: 0; align-items: center; justify-content: center; }
-    .modal { width: 90vw; max-height: 90dvh; padding: 28px 20px 22px; border-radius: 18px; }
+    .modal { width: 92vw; max-height: 90dvh; border-radius: 18px; }
+    .modal-body { max-height: 90dvh; padding: 26px 20px 22px; }
     .toggle-switch button { padding: 10px 6px; font-size: .9rem; }
+    .toggle-switch { margin-bottom: 22px; }
   }
   @media (max-width: 380px) {
     .logo-img { width: 104px; height: 24px; }
