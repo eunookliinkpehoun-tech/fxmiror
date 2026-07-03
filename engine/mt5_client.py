@@ -23,24 +23,15 @@ def initialize_terminal() -> bool:
     path = config.MT5_TERMINAL_PATH
     portable = config.MT5_PORTABLE
 
-    # Try several strategies in order. Error -6 ('Authorization failed') usually
-    # means a plain attach could not authorize the Python<->terminal link (wrong
-    # terminal launched, or the terminal is not logged in), so we also try to let
-    # initialize() launch the terminal at PATH and log into the MASTER account.
+    # Two strategies, no credentials: never pass login/password/server to
+    # initialize() — doing so forces MT5 to SWITCH accounts, which disables
+    # Algorithmic Trading and causes IPC timeouts.
+    # Strategy 1: explicit path to terminal64.exe (preferred when MT5_TERMINAL_PATH set).
+    # Strategy 2: plain attach — lets the library find the running terminal on its own.
     strategies = []
     if path:
         strategies.append(("path", lambda: mt5.initialize(path, timeout=timeout, portable=portable)))
     strategies.append(("attach", lambda: mt5.initialize(timeout=timeout, portable=portable)))
-    if path and config.MASTER_LOGIN:
-        strategies.append((
-            "path+master-login",
-            lambda: mt5.initialize(
-                path, timeout=timeout, portable=portable,
-                login=int(config.MASTER_LOGIN),
-                password=config.MASTER_PASSWORD,
-                server=config.MASTER_SERVER,
-            ),
-        ))
 
     last_err = None
     for name, run in strategies:
@@ -62,18 +53,29 @@ def initialize_terminal() -> bool:
         mt5.shutdown()
 
     print("[MT5] All initialize strategies failed. Last error:", last_err)
-    if last_err and last_err[0] == -6:
-        print("[MT5] Error -6 = Authorization failed. Most common fixes:")
-        print("      * Run Python/PowerShell AND MetaTrader 5 at the SAME privilege "
-              "level (both normal, or both 'Run as administrator'). A mismatch causes -6.")
-        print("      * In MT5: Tools > Options > Expert Advisors > tick 'Allow Algorithmic "
-              "Trading'. Also confirm the terminal is logged into an account.")
-        print("      * Set MT5_TERMINAL_PATH in engine/.env to the EXACT terminal64.exe "
-              "that is running (right-click the MT5 taskbar icon > Properties).")
+    code = last_err[0] if last_err else None
+    if code == -10005:
+        print("[MT5] Error -10005 = IPC timeout. The Python package could not open the")
+        print("      shared-memory channel to the terminal. Most common fixes:")
+        print("      1) UPDATE the MetaTrader5 Python package to match the terminal build:")
+        print("         C:\\Python314\\python.exe -m pip install --upgrade MetaTrader5")
+        print("      2) MT5 and Python must run in the SAME Windows session (both in RDP,")
+        print("         not one in RDP and one via SSH/service session 0).")
+        print("      3) Run both MT5 and PowerShell at the SAME privilege level")
+        print("         (both as Administrator, or both as normal user).")
+        print("      4) Make sure 'Allow Algorithmic Trading' is enabled in MT5:")
+        print("         Tools > Options > Expert Advisors.")
+        try:
+            print(f"      [diag] MetaTrader5 package version: {mt5.__version__}")
+        except Exception:  # noqa: BLE001
+            pass
+    elif code == -6:
+        print("[MT5] Error -6 = Authorization failed.")
+        print("      * Same privilege level required for MT5 and Python.")
+        print("      * Enable 'Allow Algorithmic Trading' in MT5 Options.")
     else:
-        print("[MT5] Checklist: 1) MetaTrader 5 is open and logged in, 2) MT5_TERMINAL_PATH "
-              "points to the EXACT terminal64.exe running, 3) 'Allow Algorithmic Trading' is "
-              "enabled, 4) 64-bit Python matches the 64-bit terminal.")
+        print("[MT5] Checklist: 1) MT5 is open and logged in, 2) MT5_TERMINAL_PATH points")
+        print("      to the running terminal64.exe, 3) Algorithmic Trading enabled.")
     return False
 
 
