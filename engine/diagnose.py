@@ -128,6 +128,54 @@ else:
                     env_path = t
                     break
 
+# ── 5b. Named pipes — the actual IPC channel ────────────────────
+section("5b. MetaQuotes Named Pipes (IPC channel)")
+print("  MT5 opens a named pipe when it is ready for Python connections.")
+print("  If NO pipes appear below, that is the direct cause of IPC timeout.")
+try:
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-Command",
+         r"[System.IO.Directory]::GetFiles('\\.\pipe\') | "
+         r"Where-Object { $_ -match 'MetaQuotes|MetaTrader|mt5|terminal' }"],
+        capture_output=True, text=True, timeout=10
+    )
+    pipes = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+    if pipes:
+        print(f"  FOUND {len(pipes)} MetaQuotes pipe(s):")
+        for p in pipes:
+            print(f"    {p}")
+        print("  OK — IPC channel is open. The issue is likely the package version.")
+    else:
+        print("  *** NO MetaQuotes pipes found!")
+        print("  *** This means MT5 has NOT opened its IPC port yet.")
+        print("  *** Fixes:")
+        print("      1) Make sure MT5 is FULLY loaded: charts visible, market data ticking.")
+        print("      2) In MT5: Tools > Options > Expert Advisors > tick ALL three:")
+        print("         - Allow algorithmic trading")
+        print("         - Allow DLL imports")
+        print("         - Allow WebRequest")
+        print("      3) Close MT5 completely (File > Exit), reopen it, wait 30s, retry.")
+except Exception as e:
+    print(f"  Could not list pipes (requires PowerShell): {e}")
+
+# ── 5c. Data-folder terminal path (build 5836 requirement) ──────
+section("5c. Data-folder terminal64.exe (required for build 5836)")
+import glob as _glob
+roaming = os.environ.get("APPDATA", "")
+data_folder_hits = _glob.glob(
+    os.path.join(roaming, "MetaQuotes", "Terminal", "*", "terminal64.exe")
+)
+if data_folder_hits:
+    for h in data_folder_hits:
+        print(f"  FOUND data-folder exe: {h}")
+    print()
+    print("  ** Build 5836 requires initializing with this data-folder path, NOT")
+    print("  ** the install-dir path. Add to engine/.env:")
+    print(f"  MT5_TERMINAL_PATH={data_folder_hits[0]}")
+else:
+    print("  No data-folder terminal64.exe found under APPDATA\\MetaQuotes\\Terminal\\*")
+    print(f"  APPDATA = {roaming}")
+
 # ── 6. mt5.initialize() — step by step ──────────────────────────
 section("6. mt5.initialize() — step by step with 30s timeout")
 
@@ -153,15 +201,22 @@ def try_init(label, **kwargs):
     return False
 
 timeout = 30000
+succeeded = False
 
-# Attempt A: plain attach
-if not try_init("plain attach", timeout=timeout):
-    # Attempt B: with path
-    if env_path:
-        if not try_init("path only", path=env_path, timeout=timeout):
-            print("\n  *** Both strategies failed. See session/privilege info above.")
-    else:
-        print("\n  *** No terminal path available to try path strategy.")
+# Attempt A: data-folder path (most reliable for build 5836)
+if data_folder_hits and not succeeded:
+    succeeded = try_init("data-folder path", path=data_folder_hits[0], timeout=timeout)
+
+# Attempt B: config/install-dir path
+if env_path and not succeeded:
+    succeeded = try_init("config path", path=env_path, timeout=timeout)
+
+# Attempt C: plain attach
+if not succeeded:
+    succeeded = try_init("plain attach", timeout=timeout)
+
+if not succeeded:
+    print("\n  *** All strategies failed. Check Steps 5b (pipes) and 3 (session) above.")
 
 # ── 7. Summary ──────────────────────────────────────────────────
 section("7. Summary & next steps")
