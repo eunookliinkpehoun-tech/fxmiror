@@ -22,11 +22,18 @@ def side_of(position) -> str:
     return "BUY" if position.type == mt5.POSITION_TYPE_BUY else "SELL"
 
 
-def sync_slave(account: dict, master_positions: list, master_balance: float) -> None:
+def sync_slave(
+    account: dict,
+    master_positions: list,
+    master_balance: float,
+    copy_positions: bool = True,
+) -> None:
     """Replicate the current master positions onto one slave account.
 
     `account` is a row from mt5_accounts. The terminal must already be logged
-    into this slave account before calling.
+    into this slave account before calling. When `copy_positions` is False
+    (e.g. the master was unreachable this tick) we only refresh the account
+    status/balance and do NOT open or close any trades.
     """
     user_id = account["user_id"]
 
@@ -47,7 +54,8 @@ def sync_slave(account: dict, master_positions: list, master_balance: float) -> 
 
     db.mark_account_connected(user_id, snap)
 
-    if not account.get("copy_enabled"):
+    # Only touch trades when the master was reachable and the user enabled copying.
+    if not copy_positions or not account.get("copy_enabled"):
         return
 
     slave_balance = snap["balance"]

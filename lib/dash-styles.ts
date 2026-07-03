@@ -205,6 +205,8 @@ export const dashDashboardStyles = `
   @keyframes mt5spin { to { transform: rotate(360deg); } }
   .mt5-status-error .mt5-status-title { color: #dc2626; }
   .mt5-status-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-size: 1.6rem; font-weight: 900; background: rgba(220,38,38,0.12); color: #dc2626; }
+  .mt5-status-warn { font-size: .85rem; color: #b45309; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 10px; padding: 12px 14px; max-width: 480px; line-height: 1.5; margin: 0; }
+  .mt5-status-warn code { background: rgba(0,0,0,0.06); padding: 1px 6px; border-radius: 5px; font-size: .82rem; }
 
   .mt5-left { display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .holo-ring { position: relative; width: 96px; height: 96px; display: grid; place-items: center; }

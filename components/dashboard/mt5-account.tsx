@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { isMt5Connected } from "@/lib/dashboard-types"
 import { AnimatedNumber } from "./animated-number"
 import { useDashboard } from "./dashboard-context"
@@ -9,6 +10,19 @@ export function Mt5Account() {
   const account = state?.mt5Account ?? null
   const connected = isMt5Connected(account)
   const trialActive = state?.user.trialActive
+
+  // If verification stays "pending" too long, the Python engine is likely not
+  // running on the Windows server. Warn the user after a delay.
+  const isPending = account?.status === "pending"
+  const [slowVerify, setSlowVerify] = useState(false)
+  useEffect(() => {
+    if (!isPending) {
+      setSlowVerify(false)
+      return
+    }
+    const t = setTimeout(() => setSlowVerify(true), 45000)
+    return () => clearTimeout(t)
+  }, [isPending])
 
   if (loading) {
     return (
@@ -30,6 +44,13 @@ export function Mt5Account() {
             connexion est établie par le terminal MetaTrader 5. Cela peut prendre quelques
             secondes.
           </p>
+          {slowVerify && (
+            <p className="mt5-status-warn">
+              La vérification prend plus de temps que prévu. Assurez-vous que le moteur Python
+              (<code>python main.py</code>) tourne bien sur le serveur Windows où MetaTrader 5 est
+              installé, et que le terminal MT5 est ouvert.
+            </p>
+          )}
           <button type="button" className="dash-btn dash-btn-secondary" onClick={openConnectModal}>
             Modifier les identifiants
           </button>

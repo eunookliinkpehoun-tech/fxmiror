@@ -63,17 +63,23 @@ def update_bot_profit():
 
 
 def tick():
-    # 1) Master
-    if not client.login(config.MASTER_LOGIN, config.MASTER_PASSWORD, config.MASTER_SERVER):
-        print("[MASTER] login failed, skipping tick")
-        return
-    master_snap = client.account_snapshot()
-    master_positions = client.get_open_positions()
-    master_balance = master_snap["balance"] if master_snap else 0.0
-    print(f"[{datetime.now(timezone.utc):%H:%M:%S}] master positions: {len(master_positions)}")
+    # 1) Master (best-effort). If the master login fails we STILL verify and
+    # update every user account this tick — we just skip trade copying so we
+    # never wrongly close users' positions because the master was unreachable.
+    master_positions = []
+    master_balance = 0.0
+    master_ok = client.login(config.MASTER_LOGIN, config.MASTER_PASSWORD, config.MASTER_SERVER)
+    if master_ok:
+        master_snap = client.account_snapshot()
+        master_positions = client.get_open_positions()
+        master_balance = master_snap["balance"] if master_snap else 0.0
+        print(f"[{datetime.now(timezone.utc):%H:%M:%S}] master positions: {len(master_positions)}")
+    else:
+        print("[MASTER] login failed - verifying user accounts anyway, copying disabled this tick")
 
     # 2) Slaves
     accounts = db.get_connectable_accounts()
+    print(f"[TICK] {len(accounts)} account(s) to process")
     for acc in accounts:
         try:
             password = decrypt_secret(acc["password_enc"])
@@ -82,11 +88,14 @@ def tick():
             continue
 
         if not client.login(int(acc["login"]), password, acc["server"]):
-            db.mark_account_error(acc["user_id"], "MT5 login refused. Check credentials/server.")
+            db.mark_account_error(
+                acc["user_id"],
+                "Connexion MT5 refusee. Verifiez le numero de compte, le mot de passe investisseur et le serveur.",
+            )
             continue
 
         try:
-            sync_slave(acc, master_positions, master_balance)
+            sync_slave(acc, master_positions, master_balance, copy_positions=master_ok)
         except Exception:  # noqa: BLE001
             print("[SLAVE] error:", traceback.format_exc())
 
