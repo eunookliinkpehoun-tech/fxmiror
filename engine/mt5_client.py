@@ -20,33 +20,60 @@ def initialize_terminal() -> bool:
     the master + user logins are performed later with mt5.login() in the loop.
     """
     timeout = config.MT5_TIMEOUT
-    attempts = []
-    if config.MT5_TERMINAL_PATH:
-        attempts.append(dict(path=config.MT5_TERMINAL_PATH))
-    attempts.append(dict())  # attach to an already-running terminal / default install
+    path = config.MT5_TERMINAL_PATH
+    portable = config.MT5_PORTABLE
+
+    # Try several strategies in order. Error -6 ('Authorization failed') usually
+    # means a plain attach could not authorize the Python<->terminal link (wrong
+    # terminal launched, or the terminal is not logged in), so we also try to let
+    # initialize() launch the terminal at PATH and log into the MASTER account.
+    strategies = []
+    if path:
+        strategies.append(("path", lambda: mt5.initialize(path, timeout=timeout, portable=portable)))
+    strategies.append(("attach", lambda: mt5.initialize(timeout=timeout, portable=portable)))
+    if path and config.MASTER_LOGIN:
+        strategies.append((
+            "path+master-login",
+            lambda: mt5.initialize(
+                path, timeout=timeout, portable=portable,
+                login=int(config.MASTER_LOGIN),
+                password=config.MASTER_PASSWORD,
+                server=config.MASTER_SERVER,
+            ),
+        ))
 
     last_err = None
-    for kw in attempts:
-        path = kw.get("path")
-        if path:
-            ok = mt5.initialize(path, timeout=timeout, portable=config.MT5_PORTABLE)
-        else:
-            ok = mt5.initialize(timeout=timeout, portable=config.MT5_PORTABLE)
+    for name, run in strategies:
+        try:
+            ok = run()
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            last_err = ("exception", str(exc))
+            print(f"[MT5] initialize strategy '{name}' raised:", exc)
+            continue
         if ok:
             term = mt5.terminal_info()
             if term is not None:
-                print(f"[MT5] attached to terminal: {term.name} (build {term.build}), "
+                print(f"[MT5] attached via '{name}': {term.name} (build {term.build}), "
                       f"connected={term.connected}, trade_allowed={term.trade_allowed}")
             return True
         last_err = mt5.last_error()
-        print(f"[MT5] initialize attempt failed (path={path!r}):", last_err)
+        print(f"[MT5] initialize strategy '{name}' failed:", last_err)
         mt5.shutdown()
 
-    print("[MT5] All initialize attempts failed. Last error:", last_err)
-    print("[MT5] Checklist: 1) MetaTrader 5 is open, 2) MT5_TERMINAL_PATH points to "
-          "the EXACT terminal64.exe that is running, 3) 'Allow Algorithmic Trading' is "
-          "enabled in MT5 (Tools > Options > Expert Advisors), 4) 64-bit Python matches "
-          "the 64-bit terminal.")
+    print("[MT5] All initialize strategies failed. Last error:", last_err)
+    if last_err and last_err[0] == -6:
+        print("[MT5] Error -6 = Authorization failed. Most common fixes:")
+        print("      * Run Python/PowerShell AND MetaTrader 5 at the SAME privilege "
+              "level (both normal, or both 'Run as administrator'). A mismatch causes -6.")
+        print("      * In MT5: Tools > Options > Expert Advisors > tick 'Allow Algorithmic "
+              "Trading'. Also confirm the terminal is logged into an account.")
+        print("      * Set MT5_TERMINAL_PATH in engine/.env to the EXACT terminal64.exe "
+              "that is running (right-click the MT5 taskbar icon > Properties).")
+    else:
+        print("[MT5] Checklist: 1) MetaTrader 5 is open and logged in, 2) MT5_TERMINAL_PATH "
+              "points to the EXACT terminal64.exe running, 3) 'Allow Algorithmic Trading' is "
+              "enabled, 4) 64-bit Python matches the 64-bit terminal.")
     return False
 
 
