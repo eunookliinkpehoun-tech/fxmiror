@@ -36,16 +36,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/dashboard", { cache: "no-store" })
-      // DEV BYPASS: ignore 401, inject mock state so the UI is visible without a session
       if (res.status === 401) {
-        setState({
-          user: { id: "dev", name: "Demo User", email: "demo@fxmirror.io", role: "user", trialEndsAt: new Date(Date.now() + 48 * 3600 * 1000) },
-          mt5Account: null,
-          botState: "stopped",
-          botSession: null,
-          copyTradeEnabled: false,
-        })
-        setLoading(false)
+        // No valid session -> back to the public landing page.
+        window.location.href = "/"
         return
       }
       const data = await res.json()
