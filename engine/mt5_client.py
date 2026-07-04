@@ -128,20 +128,68 @@ def _filling_mode(symbol: str):
     return mt5.ORDER_FILLING_RETURN
 
 
-def ensure_symbol(symbol: str) -> bool:
+def resolve_symbol(symbol: str) -> str | None:
+    """Find the exact symbol name available on this broker.
+
+    Brokers add/remove suffixes like 'm', '.r', '#', '.', etc.
+    We try the symbol as-is first, then strip/add common suffixes until
+    we find one that the terminal actually knows.
+
+    Returns the resolved symbol name, or None if nothing matches.
+    """
+    # 1) Try exact match
     info = mt5.symbol_info(symbol)
+    if info is not None:
+        return symbol
+
+    # 2) Strip common broker suffixes and try bare name
+    import re
+    base = re.sub(r'[.#m]$', '', symbol, flags=re.IGNORECASE)
+    base = re.sub(r'\.\w+$', '', base)   # strip .r, .z, etc.
+    if base != symbol:
+        info = mt5.symbol_info(base)
+        if info is not None:
+            return base
+
+    # 3) Search all available symbols for one whose base matches
+    all_symbols = mt5.symbols_get()
+    if all_symbols:
+        for s in all_symbols:
+            s_base = re.sub(r'[.#m]$', '', s.name, flags=re.IGNORECASE)
+            s_base = re.sub(r'\.\w+$', '', s_base)
+            if s_base.upper() == base.upper():
+                return s.name
+
+    return None
+
+
+def ensure_symbol(symbol: str) -> str | None:
+    """Make the symbol visible in MarketWatch and return its resolved name.
+
+    Returns the actual broker symbol name (may differ from master's name),
+    or None if the symbol cannot be found on this broker.
+    """
+    resolved = resolve_symbol(symbol)
+    if resolved is None:
+        return None
+    info = mt5.symbol_info(resolved)
     if info is None:
-        return False
+        return None
     if not info.visible:
-        return mt5.symbol_select(symbol, True)
-    return True
+        if not mt5.symbol_select(resolved, True):
+            return None
+    return resolved
 
 
 def open_market_order(symbol: str, side: str, volume: float):
     """side: 'BUY' or 'SELL'. Returns the mt5 order result (or None)."""
-    if not ensure_symbol(symbol):
-        print(f"[MT5] symbol not available: {symbol}")
+    resolved = ensure_symbol(symbol)
+    if resolved is None:
+        print(f"[MT5] symbol not available on this broker: {symbol}")
         return None
+    if resolved != symbol:
+        print(f"[MT5] symbol mapped: {symbol} -> {resolved}")
+    symbol = resolved
     tick = mt5.symbol_info_tick(symbol)
     if tick is None:
         return None
@@ -164,7 +212,7 @@ def open_market_order(symbol: str, side: str, volume: float):
 
 def close_position(position) -> bool:
     """Close an open position by sending the opposite market order."""
-    symbol = position.symbol
+    symbol = resolve_symbol(position.symbol) or position.symbol
     tick = mt5.symbol_info_tick(symbol)
     if tick is None:
         return False
